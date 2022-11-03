@@ -1,0 +1,56 @@
+version: '3'
+
+# 定义两个网络，只有处于同一网络下的容器才能通讯
+networks:
+  web_network:
+    driver: bridge
+  db_network:
+    driver: bridge
+
+services:
+  app:
+    # 除正常工作外，容器会在任何时候重启，比如遭遇 bug、进程崩溃、docker 重启等情况
+    restart: always
+    build:
+      # 构建镜像的上下文环境所在目录，相对当前docker-compose.yml的位置
+      context: ./backend
+      # 指定用于构建镜像的Dockerfile（ps: 命名不需要一定为Dockerfile）
+      dockerfile: Dockerfile
+    # 数据卷，使宿主机的内容可以映射到容器中，当宿主机指定目录的内容更新时，容器中的指定目录中的内容也会相应更新
+    # 所以使用数据卷时，一定要注意路径是否正确，否则会出现文件找不到或不存在的情况
+    volumes:
+      - ~/www/Babysite-django:/home/backend/
+      - ~/www/Babysite-docker/backend/uwsgi/uwsgi.ini:/home/uwsgi.ini
+      - ~/www/Babysite-docker/runtime/uwsgi/:/home/uwsgi/
+    # 设置容器名字
+    container_name: babysite-backend
+    image: babysite/backend:v1
+    command: uwsgi /home/uwsgi.ini
+    # 暴露端口，但不暴露给宿主机，只给连接的服务访问
+    expose:
+      - 8001
+    networks:
+      - web_network
+      - db_network
+
+  web:
+    # 除正常工作外，容器会在任何时候重启，比如遭遇 bug、进程崩溃、docker 重启等情况
+    restart: always
+    build:
+      # 构建镜像的上下文环境所在目录，相对当前docker-compose.yml的位置
+      context: ./frontend
+      # 指定用于构建镜像的Dockerfile（ps: 命名不需要一定为Dockerfile）
+      dockerfile: Dockerfile
+    volumes:
+      - ~/www/Babysite-vue/dist/:/usr/share/nginx/html
+      - ~/www/Babysite-docker/frontend/nginx/conf/conf.d:/etc/nginx/conf.d
+      - ~/www/Babysite-docker/frontend/nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ~/www/Babysite-docker/runtime/nginx/log:/var/log/nginx
+    # 设置容器名字
+    container_name: babysite-frontend
+    # 暴露端口，但不暴露给宿主机，只给连接的服务访问
+    ports:
+      - 80:8000
+    image: babysite/frontend:v1
+    networks:
+      - web_network
